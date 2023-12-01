@@ -1,11 +1,12 @@
 //
-//  ViewController.swift
+//  SecondViewController.swift
 //  NetworkMonitorTestUIKit
 //
 //  Created by Brandon Suarez on 11/17/23.
 //
 
 import UIKit
+import Network
 
 fileprivate enum Constants {
     static let wifiConnectedImage: String = "wifi"
@@ -14,7 +15,8 @@ fileprivate enum Constants {
     static let notConnectedMessage: String = "You are not Connected"
 }
 
-class ViewController: UIViewController {
+class SecondViewController: UIViewController {
+    
     // UI Elements
     let containerStack = UIStackView()
     
@@ -22,36 +24,72 @@ class ViewController: UIViewController {
     let mainLabel = UILabel()
     let secondaryLabel = UILabel()
     
-    var monitor = NetworkMonitor.shared
-    
-    
+    public private(set) var connectionType: ConnectionType = .unknown
+
     override func viewDidLoad() {
         super.viewDidLoad()
+        monitorNetwork()
         setupViews()
 
-        let connectionType = NetworkMonitor.shared.connectionType
-        
-        if monitor.isConnected {
-            DispatchQueue.main.async { [unowned self] in
-                self.mainLabel.text = Constants.connectedMessage
-                self.secondaryLabel.text = "\(connectionType) Connection"
-                self.image.image = .init(systemName: Constants.wifiConnectedImage)
-                print("You are Connected")
-            }
-
-        } else {
-            DispatchQueue.main.async { [unowned self] in
-                mainLabel.text = Constants.notConnectedMessage
-                secondaryLabel.text = "No \(connectionType) Connection"
-                image.image = .init(systemName: Constants.wifiNotConnectedImage)
-                print("You are not connected")
-            }
+        // Do any additional setup after loading the view.
+    }
+    
+    enum ConnectionType {
+        case wifi
+        case cellular
+        case ethernet
+        case unknown
+    }
+    
+    private func getConnectionType( _ path: NWPath) {
+        if path.usesInterfaceType(.wifi) {
+            connectionType = .wifi
+        }
+        else if path.usesInterfaceType(.cellular) {
+            connectionType = .cellular
+        }
+        else if path.usesInterfaceType(.wiredEthernet) {
+            connectionType = .ethernet
+        }
+        else {
+            connectionType = .unknown
         }
     }
+    
+    func monitorNetwork() {
+        let monitor = NWPathMonitor()
+        let queue = DispatchQueue(label: "NetworkMonitor")
+        
+        
+        monitor.pathUpdateHandler = { [unowned self] path in
+            
+            self.getConnectionType(path)
+            
+            if path.status == .satisfied {
+                DispatchQueue.main.async { [unowned self] in
+                    self.mainLabel.text = Constants.connectedMessage
+                    self.secondaryLabel.text = "\(connectionType) Connection"
+                    self.image.image = .init(systemName: Constants.wifiConnectedImage)
+                    view.backgroundColor = .systemGreen
+                }
+                print("Connected")
+            } else {
+                DispatchQueue.main.async { [unowned self] in
+                    mainLabel.text = Constants.notConnectedMessage
+                    secondaryLabel.text = "No \(connectionType) Connection"
+                    image.image = .init(systemName: Constants.wifiNotConnectedImage)
+                    view.backgroundColor = .systemRed
+                }
+                print("Not Connected")
+            }
+        }
+        
+        monitor.start(queue: queue)
+    }
+
 }
 
-
-extension ViewController {
+extension SecondViewController {
     func setupViews() {
         view.backgroundColor = .white
         view.addSubview(containerStack)
